@@ -1,0 +1,78 @@
+version: '3.7'
+services:
+ #MySQL Service
+    mysql:
+        image: mysql
+        container_name: mysql_app_1
+        restart: always
+        tty: true
+        ports:
+            - "3307:3306"
+        environment:
+            MYSQL_DATABASE: hkt_shop
+            MYSQL_ROOT_PASSWORD: phamminhbien123
+            MYSQL_PASSWORD: ""
+            # MYSQL_USER: root
+            SERVICE_TAGS: dev
+            SERVICE_NAME: mysql
+        volumes:
+            - ./sql:/docker-entrypoint-initdb.d
+            - dbdata:/var/lib/mysql/
+            - ./php/my.cnf:/etc/mysql/my.cnf
+        networks:
+            - app-network
+# docker exec -it app_php bash
+ #PHP Service
+    app:
+        build:
+            args:
+                user: sammy
+                uid: 1000
+            context: .
+            dockerfile: Dockerfile
+        image: php-fpm
+        container_name: app_php
+        restart: always
+        tty: true
+        # depends_on:
+        #     - db
+        environment:
+            SERVICE_NAME: app_php
+            SERVICE_TAGS: dev
+        ports:
+            - "9000:9000"
+        extra_hosts:
+            - "internal.host:host-gateway"
+        working_dir: /var/www
+        volumes:
+            - ./:/var/www
+            - /var/www/vendor
+            - ./php/php.ini:/usr/local/etc/php/conf.d/local.ini
+        networks:
+            - app-network
+
+ #Nginx Service
+    webserver:
+        image: nginx:alpine
+        container_name: project_webserver-app_php
+        restart: always
+        tty: true
+        ports:
+            # - "${APP_PORT:-8283}:80"
+            - "8080:80"
+        depends_on:
+            - app
+        volumes:
+           - ./:/var/www
+           - ./php/conf:/etc/nginx/conf.d
+           - ./php/nginx/nginx.conf:/etc/nginx/nginx.conf:cached
+        networks:
+            - app-network
+
+networks:
+    app-network:
+        driver: bridge
+#Volumes
+volumes:
+    dbdata:
+        driver: local
